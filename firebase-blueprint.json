@@ -1,0 +1,640 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Private user contact and identity profile (PII isolated to self and Business Owner).",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3,
+          "maxLength": 200
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "photoURL": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "organization": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["userId", "email", "displayName", "createdAt", "updatedAt"]
+    },
+    "UserRole": {
+      "title": "UserRole",
+      "description": "Authoritative RBAC workspace role assignment for Business Owners, Employees, and Vendors.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "orgId": {
+          "type": "string",
+          "enum": ["opspilot-main"]
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "role": {
+          "type": "string",
+          "enum": ["owner", "employee", "vendor"]
+        },
+        "requestedRole": {
+          "type": "string",
+          "enum": ["owner", "employee", "vendor"]
+        },
+        "vendorOrganization": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["userId", "orgId", "displayName", "role", "requestedRole", "active", "createdAt", "updatedAt"]
+    },
+    "FleetDispatch": {
+      "title": "FleetDispatch",
+      "description": "Real-time delivery fleet route with ordered stops, traffic/urgency metrics, and optimization tracking.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "orgId": {
+          "type": "string",
+          "enum": ["opspilot-main"]
+        },
+        "channel": {
+          "type": "string",
+          "enum": ["internal", "vendor"]
+        },
+        "vehicleCode": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 40
+        },
+        "vehicleType": {
+          "type": "string",
+          "enum": ["Cold-Chain Van", "Heavy Box Truck", "Rapid Service Van", "Partner Sprinter"]
+        },
+        "driverName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "driverInitials": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4
+        },
+        "routeCode": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 40
+        },
+        "corridor": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 160
+        },
+        "origin": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "destination": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "status": {
+          "type": "string",
+          "enum": ["En Route", "Loading", "Delayed", "Delivered", "Maintenance"]
+        },
+        "state": {
+          "type": "string",
+          "enum": ["operational", "warning", "critical", "vendor"]
+        },
+        "etaMinutes": { "type": "number" },
+        "etaFormatted": { "type": "string", "maxLength": 30 },
+        "progressPct": { "type": "number" },
+        "cargoFillPct": { "type": "number" },
+        "tempCelsius": { "type": "number" },
+        "stopsCompleted": { "type": "number" },
+        "stopsTotal": { "type": "number" },
+        "isVendorContractor": { "type": "boolean" },
+        "contractorName": { "type": "string", "maxLength": 120 },
+        "coords": { "type": "object" },
+        "stops": { "type": "array" },
+        "lastOptimizedAt": { "type": "string", "maxLength": 30 },
+        "minutesSaved": { "type": "number" },
+        "optimizationStrategy": {
+          "type": "string",
+          "enum": ["balanced", "urgency-first", "traffic-avoidance", "sla-strict"]
+        },
+        "createdBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "orgId",
+        "channel",
+        "vehicleCode",
+        "vehicleType",
+        "driverName",
+        "driverInitials",
+        "routeCode",
+        "corridor",
+        "origin",
+        "destination",
+        "status",
+        "state",
+        "etaMinutes",
+        "etaFormatted",
+        "progressPct",
+        "cargoFillPct",
+        "tempCelsius",
+        "stopsCompleted",
+        "stopsTotal",
+        "coords",
+        "stops",
+        "createdBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "VendingUnit": {
+      "title": "VendingUnit",
+      "description": "Automated vending hardware kiosk with live chiller temperature, stock ratios, and slot inventory.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "orgId": {
+          "type": "string",
+          "enum": ["opspilot-main"]
+        },
+        "serial": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "model": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "siteName": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "zone": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "status": {
+          "type": "string",
+          "enum": ["Online", "Low Stock", "Thermal Alert", "Offline", "Restocking"]
+        },
+        "state": {
+          "type": "string",
+          "enum": ["operational", "warning", "critical", "vendor"]
+        },
+        "stockPct": { "type": "number" },
+        "tempCelsius": { "type": "number" },
+        "targetTempCelsius": { "type": "number" },
+        "cashlessStatus": {
+          "type": "string",
+          "enum": ["Nominal", "Degraded", "Offline"]
+        },
+        "compressorHealthPct": { "type": "number" },
+        "revenue24h": { "type": "number" },
+        "transactions24h": { "type": "number" },
+        "lastHeartbeat": { "type": "string", "maxLength": 40 },
+        "assignedVendor": { "type": "string", "maxLength": 120 },
+        "coords": { "type": "object" },
+        "slots": { "type": "array" },
+        "createdBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "orgId",
+        "serial",
+        "model",
+        "siteName",
+        "zone",
+        "status",
+        "state",
+        "stockPct",
+        "tempCelsius",
+        "targetTempCelsius",
+        "cashlessStatus",
+        "compressorHealthPct",
+        "revenue24h",
+        "transactions24h",
+        "lastHeartbeat",
+        "assignedVendor",
+        "coords",
+        "slots",
+        "createdBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "VendorRestockOrder": {
+      "title": "VendorRestockOrder",
+      "description": "Third-party vendor restocking batch order with approval, dispatch, and fill confirmation states.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "orgId": {
+          "type": "string",
+          "enum": ["opspilot-main"]
+        },
+        "channel": {
+          "type": "string",
+          "enum": ["vendor"]
+        },
+        "vendorName": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "contractorLead": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "targetSite": { "type": "string", "minLength": 2, "maxLength": 140 },
+        "unitId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "zone": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "skuCount": { "type": "number" },
+        "palletWeightKg": { "type": "number" },
+        "estimatedCost": { "type": "number" },
+        "slaWindow": { "type": "string", "maxLength": 60 },
+        "status": {
+          "type": "string",
+          "enum": ["Pending Approval", "Approved", "Dispatched", "Completed"]
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["Standard", "Priority", "Urgent"]
+        },
+        "createdAtLabel": { "type": "string", "maxLength": 30 },
+        "autoTriggered": { "type": "boolean" },
+        "createdBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "orgId",
+        "channel",
+        "vendorName",
+        "contractorLead",
+        "targetSite",
+        "unitId",
+        "zone",
+        "skuCount",
+        "palletWeightKg",
+        "estimatedCost",
+        "slaWindow",
+        "status",
+        "priority",
+        "createdAtLabel",
+        "autoTriggered",
+        "createdBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "OpsIncident": {
+      "title": "OpsIncident",
+      "description": "Operational fault, thermal excursion, or route delay incident with shift timeline entries.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "orgId": {
+          "type": "string",
+          "enum": ["opspilot-main"]
+        },
+        "title": { "type": "string", "minLength": 2, "maxLength": 160 },
+        "assetId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "assetCategory": {
+          "type": "string",
+          "enum": ["Vending Hardware", "Fleet Unit", "Cold-Chain", "Payment Gateway"]
+        },
+        "zone": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "severity": {
+          "type": "string",
+          "enum": ["Critical", "Warning", "Resolved"]
+        },
+        "acknowledged": { "type": "boolean" },
+        "reportedAt": { "type": "string", "maxLength": 30 },
+        "slaMinutesRemaining": { "type": "number" },
+        "assignedTech": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "description": { "type": "string", "minLength": 2, "maxLength": 1000 },
+        "timeline": { "type": "array" },
+        "createdBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "orgId",
+        "title",
+        "assetId",
+        "assetCategory",
+        "zone",
+        "severity",
+        "acknowledged",
+        "reportedAt",
+        "slaMinutesRemaining",
+        "assignedTech",
+        "description",
+        "timeline",
+        "createdBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "WorkspaceSettings": {
+      "title": "WorkspaceSettings",
+      "description": "Company branding and operational settings managed by the Business Owner.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "enum": ["main"]
+        },
+        "orgId": {
+          "type": "string",
+          "enum": ["opspilot-main"]
+        },
+        "companyName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "regionName": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "currencySymbol": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5
+        },
+        "updatedBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "orgId", "companyName", "currencySymbol", "updatedBy", "createdAt", "updatedAt"]
+    },
+    "VendorPartner": {
+      "title": "VendorPartner",
+      "description": "Real third-party vendor or restocking partner company registered by the Business Owner.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "orgId": {
+          "type": "string",
+          "enum": ["opspilot-main"]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "lead": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "slaTargetPct": { "type": "number" },
+        "avgTurnaroundMin": { "type": "number" },
+        "contactNote": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "createdBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "id",
+        "orgId",
+        "name",
+        "lead",
+        "slaTargetPct",
+        "avgTurnaroundMin",
+        "createdBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "Immutable, append-only operational audit log entry capturing status updates, incidents, hardware actions, restock approvals, and account modifications.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "orgId": {
+          "type": "string",
+          "enum": ["opspilot-main"]
+        },
+        "category": {
+          "type": "string",
+          "enum": ["dispatch", "hardware", "vendor", "incident", "account", "workspace"]
+        },
+        "action": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 240
+        },
+        "details": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "targetId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "targetLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "actorUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "actorName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "actorRole": {
+          "type": "string",
+          "enum": ["owner", "employee", "vendor"]
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["info", "success", "warning", "critical"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "orgId",
+        "category",
+        "action",
+        "summary",
+        "targetId",
+        "targetLabel",
+        "actorUid",
+        "actorName",
+        "actorRole",
+        "severity",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/workspaceSettings/{settingId}": {
+      "schema": { "$ref": "#/entities/WorkspaceSettings" },
+      "description": "Business Owner company branding and regional workspace configuration."
+    },
+    "/vendorPartners/{partnerId}": {
+      "schema": { "$ref": "#/entities/VendorPartner" },
+      "description": "Registered third-party vendor partner organizations."
+    },
+    "/userProfiles/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private PII user profiles accessible strictly to the user and Business Owner."
+    },
+    "/userRoles/{userId}": {
+      "schema": { "$ref": "#/entities/UserRole" },
+      "description": "Authoritative RBAC role assignments separating Business Owners, Employees, and Vendors."
+    },
+    "/dispatches/{dispatchId}": {
+      "schema": { "$ref": "#/entities/FleetDispatch" },
+      "description": "Active and historical delivery routes and stop manifests."
+    },
+    "/hardwareUnits/{unitId}": {
+      "schema": { "$ref": "#/entities/VendingUnit" },
+      "description": "Automated vending machine telemetry and slot inventory records."
+    },
+    "/restockOrders/{orderId}": {
+      "schema": { "$ref": "#/entities/VendorRestockOrder" },
+      "description": "Vendor restocking queue orders coordinated between Business Owners and partner vendors."
+    },
+    "/incidents/{incidentId}": {
+      "schema": { "$ref": "#/entities/OpsIncident" },
+      "description": "Operational fault and field service triage tickets."
+    },
+    "/activityLogs/{logId}": {
+      "schema": { "$ref": "#/entities/ActivityLog" },
+      "description": "Chronological, append-only operational audit trail readable only in the Business Owner Portal."
+    }
+  }
+}

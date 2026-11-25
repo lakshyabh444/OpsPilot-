@@ -1,0 +1,6 @@
+{
+  "name": "OpsPilot Operations Hub",
+  "description": "Precision operations cockpit for real-time fleet dispatch, route fulfillment, automated vending hardware telemetry, and vendor restocking workflows.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

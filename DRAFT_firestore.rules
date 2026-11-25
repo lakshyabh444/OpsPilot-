@@ -1,0 +1,571 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Pillar 0: Default-deny global catch-all safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // =========================================================================
+    // Global Hardened Primitives
+    // =========================================================================
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSelf(userId) {
+      return isVerifiedUser() && request.auth.uid == userId;
+    }
+
+    function isBootstrappedOwner() {
+      return isVerifiedUser() && request.auth.token.email == 'lakshyabh444@gmail.com';
+    }
+
+    function hasRoleDoc() {
+      return exists(/databases/$(database)/documents/userRoles/$(request.auth.uid));
+    }
+
+    function getRoleData() {
+      return get(/databases/$(database)/documents/userRoles/$(request.auth.uid)).data;
+    }
+
+    function isOwner() {
+      return isBootstrappedOwner() ||
+        (isVerifiedUser() && hasRoleDoc() && getRoleData().active == true && getRoleData().role == 'owner');
+    }
+
+    function isEmployee() {
+      return isVerifiedUser() && hasRoleDoc() && getRoleData().active == true && getRoleData().role == 'employee';
+    }
+
+    function isVendor() {
+      return isVerifiedUser() && hasRoleDoc() && getRoleData().active == true && getRoleData().role == 'vendor';
+    }
+
+    function isValidCoords(c) {
+      return c is map &&
+        c.keys().hasAll(['x', 'y']) &&
+        c.keys().hasOnly(['x', 'y']) &&
+        c.x is number && c.x >= 0 && c.x <= 100 &&
+        c.y is number && c.y >= 0 && c.y <= 100;
+    }
+
+    // =========================================================================
+    // Validation Blueprints (Pillar 2: Anti-Update-Gap)
+    // =========================================================================
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll(['userId', 'email', 'displayName', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['userId', 'email', 'displayName', 'photoURL', 'organization', 'phone', 'createdAt', 'updatedAt']) &&
+        isValidId(data.userId) && data.userId == userId &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 200 &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
+        (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500)) &&
+        (!('organization' in data) || (data.organization is string && data.organization.size() <= 120)) &&
+        (!('phone' in data) || (data.phone is string && data.phone.size() <= 40)) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidUserRole(data, userId) {
+      return data.keys().hasAll(['userId', 'orgId', 'displayName', 'role', 'requestedRole', 'active', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['userId', 'orgId', 'displayName', 'role', 'requestedRole', 'vendorOrganization', 'active', 'createdAt', 'updatedAt']) &&
+        isValidId(data.userId) && data.userId == userId &&
+        data.orgId == 'opspilot-main' &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100 &&
+        data.role in ['owner', 'employee', 'vendor'] &&
+        data.requestedRole in ['owner', 'employee', 'vendor'] &&
+        (!('vendorOrganization' in data) || (data.vendorOrganization is string && data.vendorOrganization.size() <= 120)) &&
+        data.active is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidFleetDispatch(data, dispatchId) {
+      return data.keys().hasAll([
+          'id', 'orgId', 'channel', 'vehicleCode', 'vehicleType', 'driverName',
+          'driverInitials', 'routeCode', 'corridor', 'origin', 'destination',
+          'status', 'state', 'etaMinutes', 'etaFormatted', 'progressPct',
+          'cargoFillPct', 'tempCelsius', 'stopsCompleted', 'stopsTotal',
+          'coords', 'stops', 'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'orgId', 'channel', 'vehicleCode', 'vehicleType', 'driverName',
+          'driverInitials', 'routeCode', 'corridor', 'origin', 'destination',
+          'status', 'state', 'etaMinutes', 'etaFormatted', 'progressPct',
+          'cargoFillPct', 'tempCelsius', 'stopsCompleted', 'stopsTotal',
+          'isVendorContractor', 'contractorName', 'coords', 'stops',
+          'lastOptimizedAt', 'minutesSaved', 'optimizationStrategy',
+          'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.id) && data.id == dispatchId &&
+        data.orgId == 'opspilot-main' &&
+        data.channel in ['internal', 'vendor'] &&
+        data.vehicleCode is string && data.vehicleCode.size() >= 2 && data.vehicleCode.size() <= 40 &&
+        data.vehicleType in ['Cold-Chain Van', 'Heavy Box Truck', 'Rapid Service Van', 'Partner Sprinter'] &&
+        data.driverName is string && data.driverName.size() >= 1 && data.driverName.size() <= 100 &&
+        data.driverInitials is string && data.driverInitials.size() >= 1 && data.driverInitials.size() <= 4 &&
+        data.routeCode is string && data.routeCode.size() >= 2 && data.routeCode.size() <= 40 &&
+        data.corridor is string && data.corridor.size() >= 2 && data.corridor.size() <= 160 &&
+        data.origin is string && data.origin.size() >= 2 && data.origin.size() <= 120 &&
+        data.destination is string && data.destination.size() >= 2 && data.destination.size() <= 120 &&
+        data.status in ['En Route', 'Loading', 'Delayed', 'Delivered', 'Maintenance'] &&
+        data.state in ['operational', 'warning', 'critical', 'vendor'] &&
+        data.etaMinutes is number && data.etaMinutes >= 0 && data.etaMinutes <= 1440 &&
+        data.etaFormatted is string && data.etaFormatted.size() >= 1 && data.etaFormatted.size() <= 30 &&
+        data.progressPct is number && data.progressPct >= 0 && data.progressPct <= 100 &&
+        data.cargoFillPct is number && data.cargoFillPct >= 0 && data.cargoFillPct <= 100 &&
+        data.tempCelsius is number && data.tempCelsius >= -30 && data.tempCelsius <= 60 &&
+        data.stopsCompleted is number && data.stopsCompleted >= 0 && data.stopsCompleted <= 25 &&
+        data.stopsTotal is number && data.stopsTotal >= 1 && data.stopsTotal <= 25 &&
+        (!('isVendorContractor' in data) || data.isVendorContractor is bool) &&
+        (!('contractorName' in data) || (data.contractorName is string && data.contractorName.size() <= 120)) &&
+        isValidCoords(data.coords) &&
+        data.stops is list && data.stops.size() >= 1 && data.stops.size() <= 25 && data.stops[0] is map &&
+        (!('lastOptimizedAt' in data) || (data.lastOptimizedAt is string && data.lastOptimizedAt.size() <= 30)) &&
+        (!('minutesSaved' in data) || (data.minutesSaved is number && data.minutesSaved >= 0 && data.minutesSaved <= 600)) &&
+        (!('optimizationStrategy' in data) || data.optimizationStrategy in ['balanced', 'urgency-first', 'traffic-avoidance', 'sla-strict']) &&
+        isValidId(data.createdBy) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidVendingUnit(data, unitId) {
+      return data.keys().hasAll([
+          'id', 'orgId', 'serial', 'model', 'siteName', 'zone', 'status', 'state',
+          'stockPct', 'tempCelsius', 'targetTempCelsius', 'cashlessStatus',
+          'compressorHealthPct', 'revenue24h', 'transactions24h', 'lastHeartbeat',
+          'assignedVendor', 'coords', 'slots', 'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'orgId', 'serial', 'model', 'siteName', 'zone', 'status', 'state',
+          'stockPct', 'tempCelsius', 'targetTempCelsius', 'cashlessStatus',
+          'compressorHealthPct', 'revenue24h', 'transactions24h', 'lastHeartbeat',
+          'assignedVendor', 'coords', 'slots', 'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.id) && data.id == unitId &&
+        data.orgId == 'opspilot-main' &&
+        data.serial is string && data.serial.size() >= 2 && data.serial.size() <= 60 &&
+        data.model is string && data.model.size() >= 2 && data.model.size() <= 80 &&
+        data.siteName is string && data.siteName.size() >= 2 && data.siteName.size() <= 140 &&
+        data.zone is string && data.zone.size() >= 2 && data.zone.size() <= 80 &&
+        data.status in ['Online', 'Low Stock', 'Thermal Alert', 'Offline', 'Restocking'] &&
+        data.state in ['operational', 'warning', 'critical', 'vendor'] &&
+        data.stockPct is number && data.stockPct >= 0 && data.stockPct <= 100 &&
+        data.tempCelsius is number && data.tempCelsius >= -30 && data.tempCelsius <= 60 &&
+        data.targetTempCelsius is number && data.targetTempCelsius >= -30 && data.targetTempCelsius <= 30 &&
+        data.cashlessStatus in ['Nominal', 'Degraded', 'Offline'] &&
+        data.compressorHealthPct is number && data.compressorHealthPct >= 0 && data.compressorHealthPct <= 100 &&
+        data.revenue24h is number && data.revenue24h >= 0 && data.revenue24h <= 1000000 &&
+        data.transactions24h is number && data.transactions24h >= 0 && data.transactions24h <= 100000 &&
+        data.lastHeartbeat is string && data.lastHeartbeat.size() >= 1 && data.lastHeartbeat.size() <= 40 &&
+        data.assignedVendor is string && data.assignedVendor.size() >= 1 && data.assignedVendor.size() <= 120 &&
+        isValidCoords(data.coords) &&
+        data.slots is list && data.slots.size() >= 1 && data.slots.size() <= 24 && data.slots[0] is map &&
+        isValidId(data.createdBy) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidRestockOrder(data, orderId) {
+      return data.keys().hasAll([
+          'id', 'orgId', 'channel', 'vendorName', 'contractorLead', 'targetSite',
+          'unitId', 'zone', 'skuCount', 'palletWeightKg', 'estimatedCost',
+          'slaWindow', 'status', 'priority', 'createdAtLabel', 'autoTriggered',
+          'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'orgId', 'channel', 'vendorName', 'contractorLead', 'targetSite',
+          'unitId', 'zone', 'skuCount', 'palletWeightKg', 'estimatedCost',
+          'slaWindow', 'status', 'priority', 'createdAtLabel', 'autoTriggered',
+          'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.id) && data.id == orderId &&
+        data.orgId == 'opspilot-main' &&
+        data.channel == 'vendor' &&
+        data.vendorName is string && data.vendorName.size() >= 2 && data.vendorName.size() <= 120 &&
+        data.contractorLead is string && data.contractorLead.size() >= 1 && data.contractorLead.size() <= 80 &&
+        data.targetSite is string && data.targetSite.size() >= 2 && data.targetSite.size() <= 140 &&
+        isValidId(data.unitId) &&
+        data.zone is string && data.zone.size() >= 2 && data.zone.size() <= 80 &&
+        data.skuCount is number && data.skuCount >= 1 && data.skuCount <= 5000 &&
+        data.palletWeightKg is number && data.palletWeightKg >= 1 && data.palletWeightKg <= 10000 &&
+        data.estimatedCost is number && data.estimatedCost >= 0 && data.estimatedCost <= 500000 &&
+        data.slaWindow is string && data.slaWindow.size() >= 1 && data.slaWindow.size() <= 60 &&
+        data.status in ['Pending Approval', 'Approved', 'Dispatched', 'Completed'] &&
+        data.priority in ['Standard', 'Priority', 'Urgent'] &&
+        data.createdAtLabel is string && data.createdAtLabel.size() >= 1 && data.createdAtLabel.size() <= 30 &&
+        data.autoTriggered is bool &&
+        isValidId(data.createdBy) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidIncident(data, incidentId) {
+      return data.keys().hasAll([
+          'id', 'orgId', 'title', 'assetId', 'assetCategory', 'zone',
+          'severity', 'acknowledged', 'reportedAt', 'slaMinutesRemaining',
+          'assignedTech', 'description', 'timeline', 'createdBy',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'orgId', 'title', 'assetId', 'assetCategory', 'zone',
+          'severity', 'acknowledged', 'reportedAt', 'slaMinutesRemaining',
+          'assignedTech', 'description', 'timeline', 'createdBy',
+          'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.id) && data.id == incidentId &&
+        data.orgId == 'opspilot-main' &&
+        data.title is string && data.title.size() >= 2 && data.title.size() <= 160 &&
+        isValidId(data.assetId) &&
+        data.assetCategory in ['Vending Hardware', 'Fleet Unit', 'Cold-Chain', 'Payment Gateway'] &&
+        data.zone is string && data.zone.size() >= 2 && data.zone.size() <= 80 &&
+        data.severity in ['Critical', 'Warning', 'Resolved'] &&
+        data.acknowledged is bool &&
+        data.reportedAt is string && data.reportedAt.size() >= 1 && data.reportedAt.size() <= 30 &&
+        data.slaMinutesRemaining is number && data.slaMinutesRemaining >= 0 && data.slaMinutesRemaining <= 10000 &&
+        data.assignedTech is string && data.assignedTech.size() >= 1 && data.assignedTech.size() <= 100 &&
+        data.description is string && data.description.size() >= 2 && data.description.size() <= 1000 &&
+        data.timeline is list && data.timeline.size() >= 1 && data.timeline.size() <= 100 && data.timeline[0] is map &&
+        isValidId(data.createdBy) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidWorkspaceSettings(data, settingId) {
+      return data.keys().hasAll(['id', 'orgId', 'companyName', 'currencySymbol', 'updatedBy', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'orgId', 'companyName', 'regionName', 'currencySymbol', 'updatedBy', 'createdAt', 'updatedAt']) &&
+        data.id == 'main' && settingId == 'main' &&
+        data.orgId == 'opspilot-main' &&
+        data.companyName is string && data.companyName.size() >= 1 && data.companyName.size() <= 100 &&
+        (!('regionName' in data) || (data.regionName is string && data.regionName.size() <= 100)) &&
+        data.currencySymbol is string && data.currencySymbol.size() >= 1 && data.currencySymbol.size() <= 5 &&
+        isValidId(data.updatedBy) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidVendorPartner(data, partnerId) {
+      return data.keys().hasAll(['id', 'orgId', 'name', 'lead', 'slaTargetPct', 'avgTurnaroundMin', 'createdBy', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'orgId', 'name', 'lead', 'slaTargetPct', 'avgTurnaroundMin', 'contactNote', 'createdBy', 'createdAt', 'updatedAt']) &&
+        isValidId(data.id) && data.id == partnerId &&
+        data.orgId == 'opspilot-main' &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 120 &&
+        data.lead is string && data.lead.size() >= 1 && data.lead.size() <= 80 &&
+        data.slaTargetPct is number && data.slaTargetPct >= 0 && data.slaTargetPct <= 100 &&
+        data.avgTurnaroundMin is number && data.avgTurnaroundMin >= 1 && data.avgTurnaroundMin <= 1440 &&
+        (!('contactNote' in data) || (data.contactNote is string && data.contactNote.size() <= 200)) &&
+        isValidId(data.createdBy) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    // =========================================================================
+    // Collection Rules
+    // =========================================================================
+
+    // 1. Private User PII Profiles (Pillar 6: Strict PII Isolation)
+    match /userProfiles/{userId} {
+      allow get: if isVerifiedUser() && isValidId(userId) && (isSelf(userId) || isOwner());
+      allow list: if isVerifiedUser() && (isBootstrappedOwner() || resource.data.userId == request.auth.uid);
+
+      allow create: if isVerifiedUser() &&
+        isValidId(userId) &&
+        isSelf(userId) &&
+        isValidUserProfile(incoming(), userId) &&
+        incoming().email == request.auth.token.email &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isVerifiedUser() &&
+        isValidId(userId) &&
+        isValidUserProfile(incoming(), userId) &&
+        incoming().userId == existing().userId &&
+        incoming().email == existing().email &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          (isSelf(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'organization', 'phone', 'updatedAt'])) ||
+          isOwner()
+        );
+
+      allow delete: if isVerifiedUser() && isValidId(userId) && isOwner();
+    }
+
+    // 2. Authoritative RBAC User Roles
+    match /userRoles/{userId} {
+      allow get: if isVerifiedUser() && isValidId(userId) && (isSelf(userId) || isOwner());
+      allow list: if isVerifiedUser() && (isBootstrappedOwner() || resource.data.userId == request.auth.uid);
+
+      allow create: if isVerifiedUser() &&
+        isValidId(userId) &&
+        isSelf(userId) &&
+        isValidUserRole(incoming(), userId) &&
+        incoming().active == true &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        (
+          (isBootstrappedOwner() && incoming().role == 'owner') ||
+          (!isBootstrappedOwner() && incoming().role in ['employee', 'vendor'])
+        );
+
+      allow update: if isVerifiedUser() &&
+        isValidId(userId) &&
+        isValidUserRole(incoming(), userId) &&
+        incoming().userId == existing().userId &&
+        incoming().orgId == existing().orgId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isOwner() ||
+          (isSelf(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'vendorOrganization', 'requestedRole', 'updatedAt']))
+        );
+
+      allow delete: if isVerifiedUser() && isValidId(userId) && isOwner();
+    }
+
+    // 3. Fleet Dispatches
+    match /dispatches/{dispatchId} {
+      allow get: if isVerifiedUser() && isValidId(dispatchId) && (isOwner() || isEmployee() || (isVendor() && existing().channel == 'vendor'));
+      allow list: if isVerifiedUser() && resource.data.orgId == 'opspilot-main';
+
+      allow create: if isVerifiedUser() &&
+        isValidId(dispatchId) &&
+        isValidFleetDispatch(incoming(), dispatchId) &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        (isOwner() || isEmployee());
+
+      allow update: if isVerifiedUser() &&
+        isValidId(dispatchId) &&
+        isValidFleetDispatch(incoming(), dispatchId) &&
+        incoming().id == existing().id &&
+        incoming().orgId == existing().orgId &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isOwner() ||
+          (
+            existing().status != 'Delivered' &&
+            (isEmployee() || (isVendor() && existing().channel == 'vendor')) &&
+            (
+              // Action: Status / Stop Progress Update
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'status', 'state', 'progressPct', 'etaFormatted', 'etaMinutes',
+                'stopsCompleted', 'stops', 'updatedAt'
+              ]) ||
+              // Action: Route Optimization Commit
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'stops', 'etaMinutes', 'etaFormatted', 'destination', 'status',
+                'state', 'lastOptimizedAt', 'minutesSaved', 'optimizationStrategy',
+                'updatedAt'
+              ])
+            )
+          )
+        );
+
+      allow delete: if isVerifiedUser() && isValidId(dispatchId) && isOwner();
+    }
+
+    // 4. Vending Hardware Units
+    match /hardwareUnits/{unitId} {
+      allow get: if isVerifiedUser() && isValidId(unitId) && (isOwner() || isEmployee() || isVendor());
+      allow list: if isVerifiedUser() && resource.data.orgId == 'opspilot-main';
+
+      allow create: if isVerifiedUser() &&
+        isValidId(unitId) &&
+        isValidVendingUnit(incoming(), unitId) &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        isOwner();
+
+      allow update: if isVerifiedUser() &&
+        isValidId(unitId) &&
+        isValidVendingUnit(incoming(), unitId) &&
+        incoming().id == existing().id &&
+        incoming().orgId == existing().orgId &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isOwner() ||
+          (
+            isEmployee() &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'status', 'state', 'cashlessStatus', 'tempCelsius',
+              'compressorHealthPct', 'lastHeartbeat', 'stockPct', 'slots', 'updatedAt'
+            ])
+          ) ||
+          (
+            isVendor() &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'status', 'state', 'stockPct', 'slots', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isVerifiedUser() && isValidId(unitId) && isOwner();
+    }
+
+    // 5. Vendor Restock Orders
+    match /restockOrders/{orderId} {
+      allow get: if isVerifiedUser() && isValidId(orderId) && (isOwner() || isEmployee() || isVendor());
+      allow list: if isVerifiedUser() && resource.data.orgId == 'opspilot-main';
+
+      allow create: if isVerifiedUser() &&
+        isValidId(orderId) &&
+        isValidRestockOrder(incoming(), orderId) &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        exists(/databases/$(database)/documents/hardwareUnits/$(incoming().unitId)) &&
+        (
+          isOwner() ||
+          ((isEmployee() || isVendor()) && incoming().status == 'Pending Approval')
+        );
+
+      allow update: if isVerifiedUser() &&
+        isValidId(orderId) &&
+        isValidRestockOrder(incoming(), orderId) &&
+        incoming().id == existing().id &&
+        incoming().orgId == existing().orgId &&
+        incoming().channel == existing().channel &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isOwner() ||
+          (
+            existing().status != 'Completed' &&
+            isVendor() &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+            (
+              (existing().status == 'Approved' && incoming().status == 'Dispatched') ||
+              (existing().status == 'Dispatched' && incoming().status == 'Completed')
+            )
+          ) ||
+          (
+            existing().status != 'Completed' &&
+            isEmployee() &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+            existing().status == 'Dispatched' &&
+            incoming().status == 'Completed'
+          )
+        );
+
+      allow delete: if isVerifiedUser() && isValidId(orderId) && isOwner();
+    }
+
+    // 6. Operational Incidents
+    match /incidents/{incidentId} {
+      allow get: if isVerifiedUser() && isValidId(incidentId) && (isOwner() || isEmployee());
+      allow list: if isVerifiedUser() && resource.data.orgId == 'opspilot-main';
+
+      allow create: if isVerifiedUser() &&
+        isValidId(incidentId) &&
+        isValidIncident(incoming(), incidentId) &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        (isOwner() || isEmployee());
+
+      allow update: if isVerifiedUser() &&
+        isValidId(incidentId) &&
+        isValidIncident(incoming(), incidentId) &&
+        incoming().id == existing().id &&
+        incoming().orgId == existing().orgId &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isOwner() ||
+          (
+            existing().severity != 'Resolved' &&
+            isEmployee() &&
+            (
+              // Action: Acknowledge / Assign Tech / Add Shift Note
+              incoming().diff(existing()).affectedKeys().hasOnly(['acknowledged', 'assignedTech', 'timeline', 'updatedAt']) ||
+              // Action: Resolve Incident
+              (
+                incoming().severity == 'Resolved' &&
+                incoming().diff(existing()).affectedKeys().hasOnly(['severity', 'acknowledged', 'slaMinutesRemaining', 'timeline', 'updatedAt'])
+              )
+            )
+          )
+        );
+
+      allow delete: if isVerifiedUser() && isValidId(incidentId) && isOwner();
+    }
+
+    // 7. Workspace Branding & Settings (Owner-managed, readable by verified team)
+    match /workspaceSettings/{settingId} {
+      allow get: if isVerifiedUser() && isValidId(settingId) && settingId == 'main';
+      allow list: if isVerifiedUser() && resource.data.orgId == 'opspilot-main';
+
+      allow create: if isVerifiedUser() &&
+        isValidId(settingId) &&
+        isValidWorkspaceSettings(incoming(), settingId) &&
+        incoming().updatedBy == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        isOwner();
+
+      allow update: if isVerifiedUser() &&
+        isValidId(settingId) &&
+        isValidWorkspaceSettings(incoming(), settingId) &&
+        incoming().id == existing().id &&
+        incoming().orgId == existing().orgId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedBy == request.auth.uid &&
+        incoming().updatedAt == request.time &&
+        isOwner();
+
+      allow delete: if isVerifiedUser() && isValidId(settingId) && isOwner();
+    }
+
+    // 8. Registered Vendor Partners (Owner-managed, readable by verified team)
+    match /vendorPartners/{partnerId} {
+      allow get: if isVerifiedUser() && isValidId(partnerId) && (isOwner() || isEmployee() || isVendor());
+      allow list: if isVerifiedUser() && resource.data.orgId == 'opspilot-main';
+
+      allow create: if isVerifiedUser() &&
+        isValidId(partnerId) &&
+        isValidVendorPartner(incoming(), partnerId) &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        isOwner();
+
+      allow update: if isVerifiedUser() &&
+        isValidId(partnerId) &&
+        isValidVendorPartner(incoming(), partnerId) &&
+        incoming().id == existing().id &&
+        incoming().orgId == existing().orgId &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        isOwner();
+
+      allow delete: if isVerifiedUser() && isValidId(partnerId) && isOwner();
+    }
+  }
+}
